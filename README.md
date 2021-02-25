@@ -12,7 +12,7 @@ To use:
    vertices file MUST BE LOADED before the edges file. Alternatively, you can append
    the edges file to the vertices file as such:
 
-      cat edges<date>.json >> vertices<date>.json
+      cat edges\<date\>.json >> vertices\<date\>.json
 
    and load it all in one shot.
 
