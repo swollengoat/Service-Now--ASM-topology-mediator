@@ -51,6 +51,11 @@ Some items to note:
       readCisFromFile=1
       readRelationshipsFromFile=1
 
+-- A tip for moving the resulting file observer file to a file observer container:
+   tar.gz the files before copying to the file observer container. It will save you
+   a metric tonne of time copying the file to the container. You can then untar.gz
+   at the container.
+
 -- There is a lot of debug output sent to stdout. Sorry about that. Feel free to:
 
    %s/print/#print/g
