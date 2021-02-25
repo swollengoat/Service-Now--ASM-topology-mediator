@@ -731,7 +731,7 @@ if __name__ == '__main__':
    #
    # option to read from existing files can be set here... if these are set to '0', we will get data from ServiceNow REST
    #
-   # note if these are set to 1, but no corrosponding file exists, it will initiate a REST call anyway.
+   # note if these are set to 1, but no corresponding file exists, it will initiate a REST call anyway.
    #
    # this is more useful for testing than anything
    #
@@ -762,6 +762,7 @@ if __name__ == '__main__':
    #
    # Next, we pull the entire relationship table. Then we will evaluate relationships that only are pertinent to our CIs of interest.
    # Both CI's of a relationship must be in our CI Class list for inclusion in topology. Any other relationship is deemed irrelevant
+   # and discarded.
    #
    ###################################################################################################################################
 

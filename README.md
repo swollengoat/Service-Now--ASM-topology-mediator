@@ -1,5 +1,7 @@
-This program brings in topology data from the ServiceNow CMDB using the ServiceNow REST
-interface.
+This script is an example of how to bring topology data from the ServiceNow CMDB into a
+file that can be ingested by the ASM file observer. It creates CI objsects from the
+specified CI classes, as well as relevant relationship information for all CIs of 
+interest.
 
 To use:
 
@@ -18,7 +20,7 @@ To use:
 
 Some items to note:
 
--- DANGER WILL ROBINSON: This script unapologetically sacrifices RAM for speed. For a 
+-- !!! A Note About RAM: This script unapologetically sacrifices RAM for speed. For a 
    CMDB containing around 4 million CIs and 5.5 million relationships, this script
    will consume around 10GB of RAM. Ensure you are running this on a system with 
    enough resources that can accommodate the size of your CMDB.
@@ -39,8 +41,12 @@ Some items to note:
    but if you would like to play with it now, you could comment out the sections that
    write out the file observer files and un-comment the sections below which pass 
    each CI and relation to the "createAsmResource" and "createAsmConnection" functions.
-   I would expect them to be ok, as they're from another ASM mediator I wrote, but I 
-   have not had the time to test them.
+   I would expect them to be ok, as they're from another working topology mediator
+   (AIX HMC mediator here): 
+
+      https://github.ibm.com/jcress/HMC-Mediator-for-Agile-Service-Manager
+
+   I have not had the time to test them with this mediation code.
 
 -- The code will write out the results of any ServiceNow REST queries to the log/ 
    directory. This allows you to make changes to the code and test the changes without
