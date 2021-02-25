@@ -4,7 +4,7 @@
 #
 # SNOW REST mediator for topology inclusion into ASM
 #
-# 10/17/20 - Jason Cress (jcress@us.ibm.com)
+# 02/09/21 - Jason Cress (jcress@us.ibm.com)
 #
 #######################################################
 
@@ -737,8 +737,8 @@ if __name__ == '__main__':
    #
    ######################################################################################################################
 
-   readCisFromFile = 1
-   readRelationshipsFromFile = 1
+   readCisFromFile = 0
+   readRelationshipsFromFile = 0
 
    ###############################################################################################################################
    #
@@ -801,6 +801,15 @@ if __name__ == '__main__':
    edges.close()
       
    #debug info
+
+   ## These functions may be used to send CI and relationships directly to ASM REST interface:
+   # UNTESTED - this is code from the HMC mediation code available here: https://github.ibm.com/jcress/HMC-Mediator-for-Agile-Service-Manager
+
+   #for ci in ciList:
+   #   createAsmResource(ci)
+
+   #for rel in relationList:
+   #   createAsmConnection(rel)
 
    print "Unique relation types:"
    for relType in relTypeSet:

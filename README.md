@@ -18,6 +18,11 @@ To use:
 
 Some items to note:
 
+-- DANGER WILL ROBINSON: This script unapologetically sacrifices RAM for speed. For a 
+   CMDB containing around 4 million CIs and 5.5 million relationships, this script
+   will consume around 10GB of RAM. Ensure you are running this on a system with 
+   enough resources that can accommodate the size of your CMDB.
+
 -- ServiceNow may throttle queries that are performed against its REST API. I have
    done a fair amount of testing with this to get a balance that is both performant,
    but does not cause ServiceNow to say "you're taking too much". This currently is
