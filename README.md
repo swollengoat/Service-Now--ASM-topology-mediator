@@ -1,0 +1,58 @@
+This program brings in topology data from the ServiceNow CMDB using the ServiceNow REST
+interface.
+
+To use:
+
+1. Specify the CMDB CIs of interest using the ciClassList variable (line 749)
+2. Configure the config/snowserver.conf file with your ServiceNow server, user, and 
+   password. User must have the ability to query REST and CMDB data.
+3. Execute the bin/getSNOWData.py script to create the file observer file.
+4. Import the generated files (located under "file-observer-files") using the ASM file
+   observer. Note that two files are created - one for edges and one for vertices. The
+   vertices file MUST BE LOADED before the edges file. Alternatively, you can append
+   the edges file to the vertices file as such:
+
+      cat edges<date>.json >> vertices<date>.json
+
+   and load it all in one shot.
+
+Some items to note:
+
+-- ServiceNow may throttle queries that are performed against its REST API. I have
+   done a fair amount of testing with this to get a balance that is both performant,
+   but does not cause ServiceNow to say "you're taking too much". This currently is
+   controlled by the 'limit' variable in both the getCiData and getCiRelationships
+   functions. It is currently set to 2500 for CI queries and 50000 for relationship
+   queries. It is likely possible that the CI query limit could be upped to close to
+   10000, but for our needs the CI count and performance was not a limiting factor.
+   The relationship queries, in our testing, had an upper bound of around 65000.
+   Either of these limits may need to be tweaked depending on your service level, if
+   you start to see errors during the REST calls.
+
+-- There are functions available that will send objects directly to the ASM REST
+   interface rather than writing out to a file. This may be implemented in the future,
+   but if you would like to play with it now, you could comment out the sections that
+   write out the file observer files and un-comment the sections below which pass 
+   each CI and relation to the "createAsmResource" and "createAsmConnection" functions.
+   I would expect them to be ok, as they're from another ASM mediator I wrote, but I 
+   have not had the time to test them.
+
+-- The code will write out the results of any ServiceNow REST queries to the log/ 
+   directory. This allows you to make changes to the code and test the changes without
+   constantly hitting the ServiceNow REST API, making the process much faster. To
+   enable reading from json files rather than the REST API, set either or both of the
+   following variables to 1, e.g.: 
+   
+      readCisFromFile=1
+      readRelationshipsFromFile=1
+
+-- There is a lot of debug output sent to stdout. Sorry about that. Feel free to:
+
+   %s/print/#print/g
+
+-- Let me know if you have questions, recommendations, or issues: jcress@us.ibm.com
+
+
+      
+
+
