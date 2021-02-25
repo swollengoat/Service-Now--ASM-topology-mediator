@@ -1,4 +1,4 @@
-ServiceNow topology mediator for Agile Service Manager
+ServiceNow topology mediator for Agile Service Manager --
 
 This script is an example of how to bring topology data from the ServiceNow CMDB into a
 file that can be ingested by the ASM file observer. It creates CI objsects from the
