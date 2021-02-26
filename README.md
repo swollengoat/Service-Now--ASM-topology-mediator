@@ -10,7 +10,8 @@ To use:
 1. Specify the CMDB CIs of interest using the ciClassList variable (line 749)
 2. Configure the config/snowserver.conf file with your ServiceNow server, user, and 
    password. User must have the ability to query REST and CMDB data.
-3. Execute the bin/getSNOWData.py script to create the file observer file.
+3. Execute the bin/getSNOWData.py (python2) or bin/getSNOWData3.py (python3) script to 
+   create the file observer files.
 4. Import the generated files (located under "file-observer-files") using the ASM file
    observer. Note that two files are created - one for edges and one for vertices. The
    vertices file MUST BE LOADED before the edges file. Alternatively, you can append
