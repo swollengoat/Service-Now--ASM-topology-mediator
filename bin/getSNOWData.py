@@ -710,11 +710,11 @@ if __name__ == '__main__':
       print "FATAL: unable to find ServiceNow server list file " + mediatorHome + "/config/snowserver.conf"
       exit()
 
-   if(os.path.isfile(mediatorHome + "/config/asmserver.conf")):
-      asmServerDict = loadAsmServer(mediatorHome + "/config/asmserver.conf")
-   else:
-      print "FATAL: unable to find ASM server configuration file " + mediatorHome + "/config/asmserver.conf"
-      exit()
+#   if(os.path.isfile(mediatorHome + "/config/asmserver.conf")):
+#      asmServerDict = loadAsmServer(mediatorHome + "/config/asmserver.conf")
+#   else:
+#      print "FATAL: unable to find ASM server configuration file " + mediatorHome + "/config/asmserver.conf"
+#      exit()
 
    if(os.path.isfile(mediatorHome  + "/config/relationship-mapping.conf")):
       relationshipMapping = loadRelationshipMapping(mediatorHome + "/config/relationship-mapping.conf")
