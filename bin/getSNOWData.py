@@ -334,7 +334,7 @@ def getCiData(runType, ciType):
          gc.collect()
          readFromRest = 0
       else:
-         print "ERROR: read from file selected, yet file for ciType " + ciType + " does not exist. Reading from REST API."
+         print "NOTE: read from file selected, yet file for ciType " + ciType + " does not exist. Reading from REST API."
          readFromRest = 1 
    else:
       readFromRest = 1
@@ -491,7 +491,7 @@ def getCiRelationships():
          print "READ COMPLETE"
          readFromRest = 0
       else:
-         print "ERROR: read from file selected, yet file for relationships does not exist. Obtaining relationships from REST API"
+         print "NOTE: read from file selected, yet file for relationships does not exist. Obtaining relationships from REST API"
          readFromRest = 1
    else:
       print "reading relationships from ServiceNow REST API"
