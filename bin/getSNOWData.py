@@ -535,7 +535,7 @@ def getCiRelationships():
          relEntries = json.loads(relDataResult)
          
          if(writeToFile):
-            print "writing " + str(len(relDataResult)) + " relationship items to file"
+            print "Saving " + str(len(relEntries)) + " relationship items to file for future"
             if(relPass == 1):
                text_file = open(mediatorHome + "/log/ciRelationships.json", "w")
             else:
@@ -555,7 +555,7 @@ def getCiRelationships():
             isMore = 1
             relPass = relPass + 1
       
-         print str(numRel) + " items in the cmdb relationships table"
+         #print str(numRel) + " items in the cmdb relationships table"
 
       writeToFile = 1
 
