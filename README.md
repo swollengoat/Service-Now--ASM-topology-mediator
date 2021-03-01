@@ -7,7 +7,10 @@ interest.
 
 To use:
 
-1. Specify the CMDB CIs of interest using the ciClassList variable (line 749)
+1. Enter the CI classes you would like to load into the ASM topology into the file:
+
+   config/classlist.conf
+
 2. Configure the config/snowserver.conf file with your ServiceNow server, user, and 
    password. User must have the ability to query REST and CMDB data.
 3. Execute the bin/getSNOWData.py (python2) or bin/getSNOWData3.py (python3) script to 
@@ -23,9 +26,9 @@ To use:
 
 Some items to note:
 
--- !!! A Note About RAM: This script unapologetically sacrifices RAM for speed. For a 
+-- A note about RAM usage:
    CMDB containing around 4 million CIs and 5.5 million relationships, this script
-   will consume around 10GB of RAM. Ensure you are running this on a system with 
+   will consume around 5GB of RAM. Ensure you are running this on a system with 
    enough resources that can accommodate the size of your CMDB.
 
 -- ServiceNow may throttle queries that are performed against its REST API. I have
@@ -55,15 +58,15 @@ Some items to note:
    directory. This allows you to make changes to the code and test the changes without
    constantly hitting the ServiceNow REST API, making the process much faster. To
    enable reading from json files rather than the REST API, set either or both of the
-   following variables to 1, e.g.: 
+   following configuration lines into the "config/getSNOWData.props":
    
       readCisFromFile=1
       readRelationshipsFromFile=1
 
 -- A tip for moving the resulting file observer file to a file observer container:
    tar.gz the files before copying to the file observer container. It will save you
-   a metric tonne of time copying the file to the container. You can then untar.gz
-   at the container.
+   a metric ton of time copying the file to the container. You can then untar.gz
+   at the container. 
 
 -- There is a lot of debug output sent to stdout. Sorry about that. Feel free to:
 

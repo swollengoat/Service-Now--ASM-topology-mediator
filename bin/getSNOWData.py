@@ -7,7 +7,7 @@
 # 02/09/21 - Jason Cress (jcress@us.ibm.com)
 #
 #######################################################
-
+import time
 import datetime
 import gc
 import random
@@ -17,15 +17,42 @@ import re
 from pprint import pprint
 import os
 import ssl
-import xml.dom.minidom
 import urllib2
 import urllib
-import xml.etree.ElementTree as ET
-import csv
 from collections import defaultdict
 from multiprocessing import Process
 
+def keyExists(d, myKey): 
+   return d.has_key(myKey) or any(myhaskey(dd) for dd in d.values() if isinstance(dd, dict))
 
+
+def loadProperties(filepath, sep='=', comment_char='#'):
+    """
+    Read the file passed as parameter as a properties file.
+    """
+    props = {}
+    with open(filepath, "rt") as f:
+        for line in f:
+            l = line.strip()
+            if l and not l.startswith(comment_char):
+                key_value = l.split(sep)
+                key = key_value[0].strip()
+                value = sep.join(key_value[1:]).strip().strip('"') 
+                props[key] = value 
+    return props
+
+def loadClassList(filepath, comment_char='#'):
+
+   ciClassList = []
+
+   with open(filepath, "rt") as f:
+      for line in f:
+         l = line.strip()
+         if l and not l.startswith(comment_char):
+            ciClassList.append(l)
+   return(ciClassList)
+ 
+#   ciClassList = { "cmdb_ci_cluster", "cmdb_ci_cluster_vip", "cmdb_ci_cluster_resource", "cmdb_ci_cluster_node", "cmdb_ci_vm", "cmdb_ci_server", "cmdb_ci_ip_router", "cmdb_ci_ip_switch", "cmdb_ci_appl", "cmdb_ci_db_instance", "cmdb_ci_service" }
 
 def loadSnowServer(filepath, sep=',', comment_char='#'):
 
@@ -290,13 +317,14 @@ def getCiData(runType, ciType):
 
    global ciSysIdSet
    global ciSysIdList
+   global readCisFromFile
 
    readCiEntries = []
    writeToFile = 0
  
    readFromRest = 1
 
-   if(readCisFromFile):
+   if(readCisFromFile == "1"):
       if(os.path.isfile(mediatorHome  + "/log/" + ciType + ".json")):
          with open(mediatorHome + "/log/" + ciType + ".json") as text_file:
             completeResult = text_file.read()
@@ -430,6 +458,7 @@ def getCiData(runType, ciType):
 
    print str(len(readCiEntries)) + " objects of type " + ciType + " found"
    del readCiEntries
+   gc.collect()
    ciSysIdSet = set(ciSysIdList) # convert our ciSysIdList to a set for faster evaluation
    print "there are " + str(len(ciSysIdSet)) + " items in ciSysIdSet, while there are " + str(len(ciSysIdList)) + " items in ciCysIdList..."
    return()
@@ -441,30 +470,31 @@ def getCiRelationships():
    # query SNOW cmdb_rel table
    #
    ###################################################
+   global readRelationshipsFromFile
 
    allRelEntries = []
-   writeToFile = 0
-
+   writeToFile = 1
    readFromRest = 0
 
-   if(readRelationshipsFromFile):
+   if(readRelationshipsFromFile == "1"):
+      writeToFile = 0
+      print "Loading relationships from file rather than ServiceNow REST interface..."
       if(os.path.isfile(mediatorHome  + "/log/ciRelationships.json")):
          with open(mediatorHome + "/log/ciRelationships.json") as text_file:
-            completeResult = text_file.read()
-            text_file.close()
-         relEntries = json.loads(completeResult)
-         print "JPCLOG: FOUND " + str(len(relEntries)) + " relationships to evaluate in the relationships json file."
-         for rel in relEntries:
-            evaluateRelationship(rel)
-         del completeResult
-         del relEntries
-         gc.collect()
+            for relResult in text_file:
+               print(str(relResult))
+               relEntries = json.loads(relResult)
+               print "JPCLOG: FOUND " + str(len(relEntries)) + " relationships for evaluation in this round of load."
+               for rel in relEntries["result"]:
+                  evaluateRelationship(rel)
+         text_file.close()
          print "READ COMPLETE"
          readFromRest = 0
       else:
          print "ERROR: read from file selected, yet file for relationships does not exist. Obtaining relationships from REST API"
          readFromRest = 1
    else:
+      print "reading relationships from ServiceNow REST API"
       readFromRest = 1
   
    if(readFromRest == 1):  
@@ -474,6 +504,7 @@ def getCiRelationships():
       method = "GET"
       isMore = 1
       offset = 0
+      relPass = 1
    
       while(isMore):
    
@@ -502,6 +533,17 @@ def getCiRelationships():
             return False
       
          relEntries = json.loads(relDataResult)
+         
+         if(writeToFile):
+            print "writing " + str(len(relDataResult)) + " relationship items to file"
+            if(relPass == 1):
+               text_file = open(mediatorHome + "/log/ciRelationships.json", "w")
+            else:
+               text_file = open(mediatorHome + "/log/ciRelationships.json", "a")
+            text_file.write(json.dumps(relDataResult))
+            text_file.write("\n")
+            text_file.close()
+
          print "evaluating " + str(len(relEntries["result"])) + " relationships in this pass"
          for rel in relEntries["result"]:
             evaluateRelationship(rel)
@@ -511,17 +553,18 @@ def getCiRelationships():
          else:
             offset = offset + limit
             isMore = 1
+            relPass = relPass + 1
       
          print str(numRel) + " items in the cmdb relationships table"
 
       writeToFile = 1
 
 
-   if(writeToFile):
-      print "writing " + str(len(allRelEntries)) + " relationship items to file"
-      text_file = open(mediatorHome + "/log/ciRelationships.json", "w")
-      text_file.write(json.dumps(allRelEntries))
-      text_file.close()
+#   if(writeToFile):
+#      print "writing " + str(len(allRelEntries)) + " relationship items to file"
+#      text_file = open(mediatorHome + "/log/ciRelationships.json", "w")
+#      text_file.write(json.dumps(allRelEntries))
+#      text_file.close()
  
    #print "cycling through " + str(len(allRelEntries)) + " relationship entries"
    #numRels = len(allRelEntries)
@@ -537,19 +580,28 @@ def evaluateRelationship(rel):
    #global allRelEntries
 
    relevant = 0
-
-   if(str(rel["child"]) == "" or str(rel["parent"]) == ""):
+   
+   if(isinstance(rel, dict)):
       pass
-      #print "===== no parent or child. we require both"
    else:
-      print "found connection with both parent and child."
-      print "Parent is: " + rel["parent"]["value"]
-      print "Child is: " + rel["child"]["value"]
-      print "evaluating ciSysIdSet to see if both child/parent is there. Length of ciSysIdSet is: " + str(len(ciSysIdSet))
+      print("relation passed to evaluateRelationship is not a dictionary. It contains the following:")
+      print(str(rel))
+      return
+
+   if(rel.has_key("child") and rel.has_key("parent")):
+      pass
+   else:
+      return
+
+   if(isinstance(rel["child"], dict) and isinstance(rel["parent"], dict)):
+      #print "found connection with both parent and child."
+      #print "Parent is: " + rel["parent"]["value"]
+      #print "Child is: " + rel["child"]["value"]
+      #print "evaluating ciSysIdSet to see if both child/parent is there. Length of ciSysIdSet is: " + str(len(ciSysIdSet))
       if(rel["child"]["value"] in ciSysIdSet and rel["parent"]["value"] in ciSysIdSet):
          #if(str(rel["parent"]) in ciSysIdList):
          if 1==1:
-            #print "===== both parent and child in ciSysIdList, i.e. in topology, saving relationship"
+            print "===== both parent and child in ciSysIdList, i.e. in topology, saving relationship"
             if( rel["type"]["value"] in relationshipMappingDict):
                thisRelType = relationshipMappingDict[ rel["type"]["value"] ]
             else:
@@ -567,6 +619,9 @@ def evaluateRelationship(rel):
       else:
          pass
          #print "neither parent or child is in siSysIdList, discarding"
+   else:
+      pass
+      # either parent or child designated is not returning dict for this entry
 
 def getCiDetail(sys_id, ciType):
 
@@ -710,6 +765,12 @@ if __name__ == '__main__':
       print "FATAL: unable to find ServiceNow server list file " + mediatorHome + "/config/snowserver.conf"
       exit()
 
+   if(os.path.isfile(mediatorHome + "/config/classlist.conf")):
+      ciClassList = loadClassList(mediatorHome + "/config/classlist.conf")
+   else:
+      print "FATAL: unable to find ServiceNow server list file " + mediatorHome + "/config/snowserver.conf"
+      exit()
+
 #   if(os.path.isfile(mediatorHome + "/config/asmserver.conf")):
 #      asmServerDict = loadAsmServer(mediatorHome + "/config/asmserver.conf")
 #   else:
@@ -724,29 +785,36 @@ if __name__ == '__main__':
    if(os.path.isfile(mediatorHome  + "/config/entitytype-mapping.conf")):
       relationshipMapping = loadEntityTypeMapping(mediatorHome + "/config/entitytype-mapping.conf")
    else:
-      print "FATAL: no relationship mapping file available at " + mediatorHome + "/config/relationship-mapping.conf"
+      print "FATAL: no entity type mapping file available at " + mediatorHome + "/config/entitytype-mapping.conf"
 
+   if(os.path.isfile(mediatorHome  + "/config/getSNOWData.props")):
+      configVars = loadProperties(mediatorHome + "/config/getSNOWData.props")
+      print str(configVars)
+      if 'readCisFromFile' in configVars.keys():
+         global readCisFromFile
+         readCisFromFile = configVars['readCisFromFile']
+         if(readCisFromFile == "1"):
+            print "will read CIs from file if available"
+         else:
+            print "will read CIs from ServiceNow REST API"
+      else:
+         print "readCisFromFile property not set, defaulting to 0, read from ServiceNow REST API"
+         readCisFromFile = 0
+      if 'readRelationshipsFromFile' in configVars.keys():
+         global readRelationshipsFromFile
+         readRelationshipsFromFile = configVars['readRelationshipsFromFile']
+         if(readRelationshipsFromFile == "1"):
+            print "will read relationships from file if available"
+         else:
+            print "will read relationships from ServiceNow REST API"
+      else:
+         print("readRelationshipsFromFile not in properties file, defaulting to 0, read from ServiceNow REST API")
+         readRelationshipsFromFile = 0
+   else:
+      print "FATAL: unable to find the properties file " + mediatorHome + "/config/getSNOWData.props"
 
-   ######################################################################################################################
-   #
-   # option to read from existing files can be set here... if these are set to '0', we will get data from ServiceNow REST
-   #
-   # note if these are set to 1, but no corresponding file exists, it will initiate a REST call anyway.
-   #
-   # this is more useful for testing than anything
-   #
-   ######################################################################################################################
-
-   readCisFromFile = 0
-   readRelationshipsFromFile = 0
-
-   ###############################################################################################################################
-   #
-   # List of CMDB CI classes that are of interest. The mediator will pull CI data and create objects for each type defined here... 
-   #
-   ###############################################################################################################################
-
-   ciClassList = { "cmdb_ci_cluster", "cmdb_ci_cluster_vip", "cmdb_ci_cluster_resource", "cmdb_ci_cluster_node", "cmdb_ci_vm", "cmdb_ci_server", "cmdb_ci_ip_router", "cmdb_ci_ip_switch", "cmdb_ci_appl", "cmdb_ci_db_instance", "cmdb_ci_service" }
+#   print("readCisFromFile is: " + str(readCisFromFile))
+#   print("readRelationshipsFromFile is: " + str(readRelationshipsFromFile))
 
    ############################################################################
    #
@@ -754,13 +822,27 @@ if __name__ == '__main__':
    #
    ############################################################################
 
+   startTime=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+   print("Start time: " + startTime)
    for className in ciClassList:
       print "querying SNOW for all CIs of type " + className
       getCiData("pre", className)
 
+   print "CI mediation complete. Writing vertices file..."   
+   vertices = open(mediatorHome + "/file-observer-files/vertices-" + str(datetime.datetime.now()) + ".json", "w")
+   for ci in ciList:
+      ci_text = json.dumps(ci)
+      vertices.write("V:" + ci_text + "\n" + "W:5 millisecond" + "\n")
+      vertices.flush()
+   vertices.close()
+   totalCi = len(ciList)
+   del ciList
+   gc.collect()
+   
+
    ###################################################################################################################################
    #
-   # Next, we pull the entire relationship table. Then we will evaluate relationships that only are pertinent to our CIs of interest.
+   # Next, we pull the relationship table. Then we will evaluate relationships that only are pertinent to our CIs of interest.
    # Both CI's of a relationship must be in our CI Class list for inclusion in topology. Any other relationship is deemed irrelevant
    # and discarded.
    #
@@ -776,31 +858,29 @@ if __name__ == '__main__':
 #   for ci in ciList:
 #      print ci["name"]
 
-   print "Number of CIs: " + str(len(ciList))
-   print "Number of Relations: " + str(len(relationList))
-
-   print "writing out file observer files..."
 
 
    # Currently, this mediator only writes out file observer files. There are functions defined above that can directly inject into ASM via REST, but not in use at this time.
    # e.g. "createAsmResource() can be used to send a ci dict in ciList directly to the ASM rest interface
  
-   print "Writing vertices..."   
-   vertices = open(mediatorHome + "/file-observer-files/vertices-" + str(datetime.datetime.now()) + ".json", "w")
-   for ci in ciList:
-      ci_text = json.dumps(ci)
-      vertices.write("V:" + ci_text + "\n" + "W:5 millisecond" + "\n")
-      vertices.flush()
-   vertices.close()
       
-   print "Writing edges..."   
+   print "Relationship mediation complete. Writing edges..."   
    edges = open(mediatorHome + "/file-observer-files/edges-" + str(datetime.datetime.now()) + ".json", "w")
    for rel in relationList:
       ci_text = json.dumps(rel)
       edges.write("E:" + ci_text + "\n" + "W:5 millisecond" + "\n")
       edges.flush()
+   totalRelation = len(relationList)
+   del relationList
+   gc.collect()
    edges.close()
       
+   print "Mediation complete."
+   print "Number of CIs: " + str(totalCi)
+   print "Number of Relations: " + str(totalRelation)
+   print "Mediation started at: " + startTime
+   print("Mediation completed at: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
    #debug info
 
    ## These functions may be used to send CI and relationships directly to ASM REST interface:
