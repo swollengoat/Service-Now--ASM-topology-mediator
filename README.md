@@ -55,7 +55,7 @@ Some items to note:
    I have not had the time to test them with this mediation code.
 
 -- The code will write out the results of any ServiceNow REST queries to the log/ 
-   directory. This allows you to make changes to the code and test the changes without
+   directory. This allows you to make changes to config and test the changes without
    constantly hitting the ServiceNow REST API, making the process much faster. To
    enable reading from json files rather than the REST API, set either or both of the
    following configuration lines into the "config/getSNOWData.props":

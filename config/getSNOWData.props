@@ -1,4 +1,4 @@
 readCisFromFile=1
 readRelationshipsFromFile=0
-saveCisToFile=1
+saveCisToFile=0
 saveRelationshipsToFile=1

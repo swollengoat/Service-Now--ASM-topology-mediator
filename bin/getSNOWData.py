@@ -7,6 +7,8 @@
 # 02/09/21 - Jason Cress (jcress@us.ibm.com)
 #
 #######################################################
+
+from httplib import IncompleteRead
 import time
 import datetime
 import gc
@@ -306,6 +308,39 @@ def createAsmConnection(connectionDict):
          print "This usually means the server doesn't exist,",
          print "is down, or we don't have an internet connection."
       return False
+
+def getTotalRelCount():
+
+   method = 'GET'
+   requestUrl = 'https://' + snowServerDict["server"] + '/api/now/stats/cmdb_rel_ci?sysparm_count=true'
+   print("issuing relationship count query: " + requestUrl)
+   authHeader = 'Basic ' + base64.b64encode(snowServerDict["user"] + ":" + snowServerDict["password"])
+     
+   try:
+      request = urllib2.Request(requestUrl)
+      request.add_header("Content-Type",'application/json')
+      request.add_header("Accept",'application/json')
+      request.add_header("Authorization",authHeader)
+      request.get_method = lambda: method
+
+      response = urllib2.urlopen(request)
+      relCountResult = response.read()
+
+   except IOError, e:
+      print 'Failed to open "%s".' % requestUrl
+      if hasattr(e, 'code'):
+         print 'We failed with error code - %s.' % e.code
+      elif hasattr(e, 'reason'):
+         print "The error object has the following 'reason' attribute :"
+         print e.reason
+         print "This usually means the server doesn't exist,",
+         print "is down, or we don't have an internet connection."
+
+
+   relCountResultDict = json.loads(relCountResult)
+   print("Found " + relCountResultDict["result"]["stats"]["count"])
+   return(int(relCountResultDict["result"]["stats"]["count"]))
+
  
 def getCiData(runType, ciType):
 
@@ -471,10 +506,12 @@ def getCiRelationships():
    #
    ###################################################
    global readRelationshipsFromFile
+   global totalSnowCmdbRelationships
 
    allRelEntries = []
    writeToFile = 1
    readFromRest = 0
+   totalRelationships = 0
 
    if(readRelationshipsFromFile == "1"):
       writeToFile = 0
@@ -482,13 +519,14 @@ def getCiRelationships():
       if(os.path.isfile(mediatorHome  + "/log/ciRelationships.json")):
          with open(mediatorHome + "/log/ciRelationships.json") as text_file:
             for relResult in text_file:
-               print(str(relResult))
+               #print(str(relResult))
                relEntries = json.loads(relResult)
-               print "JPCLOG: FOUND " + str(len(relEntries)) + " relationships for evaluation in this round of load."
+               print "JPCLOG: FOUND " + str(len(relEntries["result"])) + " relationships for evaluation in this round of load."
+               totalRelationships = totalRelationships + len(relEntries["result"])
                for rel in relEntries["result"]:
                   evaluateRelationship(rel)
          text_file.close()
-         print "READ COMPLETE"
+         print "READ COMPLETE. Evaluated " + str(totalRelationships) + " relationships for relevance."
          readFromRest = 0
       else:
          print "NOTE: read from file selected, yet file for relationships does not exist. Obtaining relationships from REST API"
@@ -505,59 +543,93 @@ def getCiRelationships():
       isMore = 1
       offset = 0
       relPass = 1
+      retryQuery = 0
+      totalRelationshipsEvaluated = 0
    
       while(isMore):
-   
-         requestUrl = 'https://' + snowServerDict["server"] + '/api/now/table/cmdb_rel_ci?sysparm_limit=' + str(limit) + '&sysparm_offset=' + str(offset)
-         print "obtaining relationships"
-     
-         try:
-            request = urllib2.Request(requestUrl)
-            request.add_header("Content-Type",'application/json')
-            request.add_header("Accept",'application/json')
-            request.add_header("Authorization",authHeader)
-            request.get_method = lambda: method
-      
-            response = urllib2.urlopen(request)
-            relDataResult = response.read()
-      
-         except IOError, e:
-            print 'Failed to open "%s".' % requestUrl
-            if hasattr(e, 'code'):
-               print 'We failed with error code - %s.' % e.code
-            elif hasattr(e, 'reason'):
-               print "The error object has the following 'reason' attribute :"
-               print e.reason
-               print "This usually means the server doesn't exist,",
-               print "is down, or we don't have an internet connection."
-            return False
-      
-         relEntries = json.loads(relDataResult)
-         
-         if(writeToFile):
-            print "Saving " + str(len(relEntries)) + " relationship items to file for future"
-            if(relPass == 1):
-               text_file = open(mediatorHome + "/log/ciRelationships.json", "w")
+ 
+         if(retryQuery > 0):
+            if(retryQuery == 4):
+               print("FATAL: Query at position: " + offset + " has failed 4 times. Skipping this segment...")
+               offset = offset + limit
             else:
-               text_file = open(mediatorHome + "/log/ciRelationships.json", "a")
-            text_file.write(json.dumps(relDataResult))
-            text_file.write("\n")
-            text_file.close()
+               print "retrying query due to read failure"
+  
+         requestUrl = 'https://' + snowServerDict["server"] + '/api/now/table/cmdb_rel_ci?sysparm_limit=' + str(limit) + '&sysparm_offset=' + str(offset)
+         print("issuing query: " + requestUrl)
+     
+         for retry in [1,2,3]:
+            try:
+               request = urllib2.Request(requestUrl)
+               request.add_header("Content-Type",'application/json')
+               request.add_header("Accept",'application/json')
+               request.add_header("Authorization",authHeader)
+               request.get_method = lambda: method
+         
+               response = urllib2.urlopen(request)
+               relDataResult = response.read()
+               break
+         
+            except (IOError, IncompleteRead), e:
+               print 'Failed to open "%s".' % requestUrl
+               if hasattr(e, 'code'):
+                  print 'We failed with error code - %s.' % e.code
+               elif hasattr(e, 'reason'):
+                  print "The error object has the following 'reason' attribute :"
+                  print e.reason
+                  print "This usually means the server doesn't exist,",
+                  print "is down, or we don't have an internet connection."
+               else:
+                  print("ERROR: Unable to read from URL: " + requestUrl)
+               if(retry == 3):
+                  print("FATAL: READ ERROR AFTER 3 TRIES: ABORTING READ")
+                  print("Aborted URL: " + requestUrl)
+                  exit()
 
-         print "evaluating " + str(len(relEntries["result"])) + " relationships in this pass"
-         for rel in relEntries["result"]:
-            evaluateRelationship(rel)
-         numRel = len(relEntries["result"])
-         if(numRel < limit):
-            isMore = 0
-         else:
-            offset = offset + limit
-            isMore = 1
-            relPass = relPass + 1
+         try:
+            relEntries = json.loads(relDataResult)
+            retryQuery = 0
+         except ValueError:
+            print("ERROR: JSON parsing failed. Retrying query")
+            retryQuery = retryQuery + 1
+
+         if(retryQuery == 0):          # Successful read/load. No need to retry
+
+            if(writeToFile):
+               print "Saving " + str(len(relEntries["result"])) + " relationship items to file for future load"
+               if(relPass == 1):
+                  text_file = open(mediatorHome + "/log/ciRelationships.json", "w")
+               else:
+                  text_file = open(mediatorHome + "/log/ciRelationships.json", "a")
+               text_file.write(relDataResult)
+               text_file.write("\n")
+               text_file.close()
+
+            totalRelationshipsEvaluated = totalRelationshipsEvaluated + len(relEntries["result"])
+   
+            print "evaluating " + str(len(relEntries["result"])) + " relationships in this pass"
+            for rel in relEntries["result"]:
+               evaluateRelationship(rel)
+
+            numRel = len(relEntries["result"])
+   
+            if(numRel < limit):
+               if(totalRelationshipsEvaluated <= (totalSnowCmdbRelationships - (limit * 2))):
+                  print("suspected short read... retrying")
+                  #offset = offset + limit
+                  #relPass = relPass + 1
+                  retryQuery = retryQuery + 1
+               else:
+                  isMore = 0
+            else:
+               offset = offset + limit
+               isMore = 1
+               relPass = relPass + 1
+               retryQuery = 0
       
          #print str(numRel) + " items in the cmdb relationships table"
 
-      writeToFile = 1
+      print "Relationship evaluation complete. Evaluated a total of " + str(totalRelationshipsEvaluated) + " relationships out of an expected " + str(totalSnowCmdbRelationships)
 
 
 #   if(writeToFile):
@@ -601,7 +673,7 @@ def evaluateRelationship(rel):
       if(rel["child"]["value"] in ciSysIdSet and rel["parent"]["value"] in ciSysIdSet):
          #if(str(rel["parent"]) in ciSysIdList):
          if 1==1:
-            print "===== both parent and child in ciSysIdList, i.e. in topology, saving relationship"
+            #print "===== both parent and child in ciSysIdList, i.e. in topology, saving relationship. Parent: " + str(rel["parent"]["value"]) + ", Child: " + str(rel["child"]["value"])
             if( rel["type"]["value"] in relationshipMappingDict):
                thisRelType = relationshipMappingDict[ rel["type"]["value"] ]
             else:
@@ -613,7 +685,6 @@ def evaluateRelationship(rel):
                relTypeSet.add(rel["type"]["value"])
             #print "found a relevant connection... adding to relationList array..."
             relationList.append(relationDict)
-            #allRelEntries.append(rel)
          else:
             pass
       else:
@@ -736,6 +807,7 @@ if __name__ == '__main__':
    global writeToFile
    global relTypeSet
    relTypeSet = set() 
+   global totalSnowCmdbRelationships
 
 
    ############################################
@@ -849,6 +921,7 @@ if __name__ == '__main__':
    ###################################################################################################################################
 
    print "Loading and evaluating relationship table"
+   totalSnowCmdbRelationships = getTotalRelCount()
    getCiRelationships()
 
 ## multi-processing stuff that isn't in use currently. could be enabled to concurrently pull all data for CIs and relationships to speed up the mediator
