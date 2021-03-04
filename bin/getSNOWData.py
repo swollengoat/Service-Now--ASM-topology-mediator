@@ -469,6 +469,7 @@ def getCiData(runType, ciType):
 
       asmObject["matchTokens"] = [ asmObject["name"] + ":" + asmObject["sys_id"] ]
       asmObject["matchTokens"].append( asmObject["sys_id"] )
+      asmObject["matchTokens"].append( asmObject["name"] )
       if asmObject.has_key("ip_address"):
          if( asmObject["ip_address"] ):
             asmObject["matchTokens"].append(asmObject["ip_address"])
